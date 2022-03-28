@@ -1,0 +1,56 @@
+name: GitHub Actions Demo
+on: 
+  push:
+  schedule:
+    - cron: "0 0 * * *"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ github.workspace }}
+    steps:
+      - run: |
+          echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
+          echo "🐧 This job is now running on a ${{ runner.os }} server hosted by GitHub!"
+          echo "🔎 The name of your branch is ${{ github.ref }} and your repository is ${{ github.repository }}."
+
+      - name: Check out repository code
+        uses: actions/checkout@v3
+
+      - name: List files in the repository
+        run: |
+          ls
+
+      - uses: actions/setup-node@v3
+        name: Set up Node.js
+        with:
+          node-version: 16
+
+      #- name: Installing necessary tools - Node.js
+      #  run: |
+      #    curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+      #    sudo apt-get install -y nodejs
+      #    apt-get install -y build-essential
+      #    node -v
+      #    npm -v
+
+      - name: Installing necessary tools - Terser
+        run: |
+          npm install terser -g
+
+      - name: Run JS compressor
+        run: |
+          terser --compress --mangle --output ./app/app-compressed.js -- ./app/app.js
+          mv -f ./app/app-compressed.js ./app/app.js
+
+      - name: Login to Docker Hub
+        run: docker login --username ${{ secrets.DOCKER_HUB_USERNAME }} --password ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      - name: Build the Docker image
+        run: docker build . --file Dockerfile --tag ${{ secrets.DOCKER_HUB_USERNAME }}/gitops-test:latest
+
+      - name: Publish the Docker image
+        run: docker push ${{ secrets.DOCKER_HUB_USERNAME }}/gitops-test:latest
+
+      - run: echo "🍏 This job's status is ${{ job.status }}."
