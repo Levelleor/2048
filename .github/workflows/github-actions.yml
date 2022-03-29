@@ -35,9 +35,9 @@ jobs:
       #    node -v
       #    npm -v
 
-      - name: Installing necessary tools - Terser
+      - name: Installing necessary tools - Terser & CDK CLI
         run: |
-          npm install terser -g
+          npm install -g terser aws-cdk
 
       - name: Run JS compressor
         run: |
@@ -52,5 +52,48 @@ jobs:
 
       - name: Publish the Docker image
         run: docker push ${{ secrets.DOCKER_HUB_USERNAME }}/gitops-test:latest
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-west-3
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          role-external-id: ${{ secrets.AWS_ROLE_EXTERNAL_ID }}
+          role-duration-seconds: 1200
+          role-session-name: GitOpsDeployment
+          role-skip-session-tagging: true
+
+      # - name: aws configure
+      #  run: |
+      #    cat <<EOT >> ~/.aws/credentials
+      #    [default]
+      #     aws_access_key_id = ${{ secrets.AWS_ACCESS_KEY_ID }}
+      #     aws_secret_access_key = ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      #     EOT"" >>
+      #     cat <<EOT >> ~/.aws/config
+      #     [default]
+      #     region = eu-west-3
+      #     output = json
+      #     EOT"" >>
+
+      - name: Creake CDK directory
+        run: |
+          mkdir cdk
+      
+      - name: Download CDK repository
+        run: |
+          git clone https://github.com/Levelleor/awscdk-test.git
+        working-directory: ${{ github.workspace }}/cdk
+
+      - name: Setup CDK resources
+        run: |
+          npm install
+        working-directory: ${{ github.workspace }}/cdk/awscdk-test
+
+      - name: Deploy container to AWS infrastructure
+        run: cdk deploy --require-approval never GitOps-ecs --parameters imageRepo=${{ secrets.DOCKER_HUB_USERNAME }}/gitops-test:latest
+        working-directory: ${{ github.workspace }}/cdk/awscdk-test
 
       - run: echo "🍏 This job's status is ${{ job.status }}."
