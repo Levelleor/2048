@@ -27,14 +27,6 @@ jobs:
         with:
           node-version: 16
 
-      #- name: Installing necessary tools - Node.js
-      #  run: |
-      #    curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
-      #    sudo apt-get install -y nodejs
-      #    apt-get install -y build-essential
-      #    node -v
-      #    npm -v
-
       - name: Installing necessary tools - Terser & CDK CLI
         run: |
           npm install -g terser aws-cdk
@@ -47,11 +39,14 @@ jobs:
       - name: Login to Docker Hub
         run: docker login --username ${{ secrets.DOCKER_HUB_USERNAME }} --password ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
 
+      - name: Write current date as container version
+        run: echo $(date +%s) > version.conf
+
       - name: Build the Docker image
-        run: docker build . --file Dockerfile --tag ${{ secrets.DOCKER_HUB_USERNAME }}/gitops-test:latest
+        run: docker build . --file Dockerfile --tag ${{ secrets.DOCKER_HUB_USERNAME }}/gitops-test:$(cat version.conf)
 
       - name: Publish the Docker image
-        run: docker push ${{ secrets.DOCKER_HUB_USERNAME }}/gitops-test:latest
+        run: docker push ${{ secrets.DOCKER_HUB_USERNAME }}/gitops-test:$(cat version.conf)
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
@@ -64,19 +59,6 @@ jobs:
           role-duration-seconds: 1200
           role-session-name: GitOpsDeployment
           role-skip-session-tagging: true
-
-      # - name: aws configure
-      #  run: |
-      #    cat <<EOT >> ~/.aws/credentials
-      #    [default]
-      #     aws_access_key_id = ${{ secrets.AWS_ACCESS_KEY_ID }}
-      #     aws_secret_access_key = ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      #     EOT"" >>
-      #     cat <<EOT >> ~/.aws/config
-      #     [default]
-      #     region = eu-west-3
-      #     output = json
-      #     EOT"" >>
 
       - name: Creake CDK directory
         run: |
@@ -93,7 +75,7 @@ jobs:
         working-directory: ${{ github.workspace }}/cdk/awscdk-test
 
       - name: Deploy container to AWS infrastructure
-        run: cdk deploy --require-approval never GitOps-ecs --parameters imageRepo=${{ secrets.DOCKER_HUB_USERNAME }}/gitops-test:latest
+        run: cdk deploy --require-approval never GitOps-ecs --parameters imageRepo=${{ secrets.DOCKER_HUB_USERNAME }}/gitops-test:$(cat ../../version.conf)
         working-directory: ${{ github.workspace }}/cdk/awscdk-test
 
       - run: echo "🍏 This job's status is ${{ job.status }}."
